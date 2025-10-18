@@ -1,4 +1,4 @@
 # ASAP-NJ
-## [ASAP-NJ, LLC](https://www.asap-nj.net)
-### https://www.asap-nj.net
-The website for ASAP-NJ
+## [ASAP-NJ Drone Services, LLC](https://www.asap-nj.com)
+### https://www.asap-nj.com
+The website for ASAP-NJ Drone Services
