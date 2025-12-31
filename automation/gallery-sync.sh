@@ -72,7 +72,8 @@ fi
 processed=0
 failed=0
 
-find "$SOURCE_DIR" -type f -regextype posix-extended -iregex ".*\.(${IMAGE_EXTS})" | sort | while read -r img_file; do
+# Use process substitution instead of pipe to avoid subshell
+while IFS= read -r img_file; do
   filename=$(basename "$img_file")
   name_no_ext="${filename%.*}"
   ext="${filename##*.}"
@@ -102,7 +103,7 @@ find "$SOURCE_DIR" -type f -regextype posix-extended -iregex ".*\.(${IMAGE_EXTS}
   else
     ((failed++))
   fi
-done
+done < <(find "$SOURCE_DIR" -type f -regextype posix-extended -iregex ".*\.(${IMAGE_EXTS})" | sort)
 
 log "Processed: $processed | Failed: $failed"
 
