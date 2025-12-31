@@ -87,12 +87,12 @@ while IFS= read -r img_file; do
   if generate_watermark "$ORIG_DIR/$filename" "$WATER_DIR/${name_no_ext}_watermarked.${ext}"; then
     # Upload watermarked version to R2
     if upload_to_r2 "$WATER_DIR/${name_no_ext}_watermarked.${ext}" "${name_no_ext}_watermarked.${ext}"; then
-      ((processed++))
+      : $((processed++))
     else
-      ((failed++))
+      : $((failed++))
     fi
   else
-    ((failed++))
+    : $((failed++))
     continue
   fi
 
@@ -101,7 +101,7 @@ while IFS= read -r img_file; do
     # Upload thumbnail to R2
     upload_to_r2 "$THUMB_DIR/${name_no_ext}_thumb.${ext}" "${name_no_ext}_thumb.${ext}"
   else
-    ((failed++))
+    : $((failed++))
   fi
 done < <(find "$SOURCE_DIR" -type f -regextype posix-extended -iregex ".*\.(${IMAGE_EXTS})" | sort)
 
