@@ -33,11 +33,12 @@ source "$SCRIPT_DIR/config/gallery.conf"
 source "$R2_CREDS"
 
 # Source functions
-source "$SCRIPT_DIR/functions/watermark.sh"
-source "$SCRIPT_DIR/functions/thumbnail.sh"
-source "$SCRIPT_DIR/functions/upload.sh"
 source "$SCRIPT_DIR/functions/catalog.sh"
 source "$SCRIPT_DIR/functions/cleanup.sh"
+source "$SCRIPT_DIR/functions/thumbnail.sh"
+source "$SCRIPT_DIR/functions/upload.sh"
+source "$SCRIPT_DIR/functions/video.sh"
+source "$SCRIPT_DIR/functions/watermark.sh"
 
 # Create working directories if they don't exist
 mkdir -p "$ORIG_DIR" "$WATER_DIR" "$THUMB_DIR" "$LOG_DIR"
@@ -50,9 +51,6 @@ log() {
 # Main execution
 log "=== Starting gallery sync (Environment: $ENVIRONMENT) ==="
 
-# Main execution
-log "=== Starting gallery sync (Environment: $ENVIRONMENT) ==="
-
 # Verify source directory exists and is accessible
 if [ ! -d "$SOURCE_DIR" ]; then
   log "ERROR: Source directory not found: $SOURCE_DIR"
@@ -61,49 +59,88 @@ fi
 
 # Count files to process
 total_images=$(find "$SOURCE_DIR" -type f -regextype posix-extended -iregex ".*\.(${IMAGE_EXTS})" | wc -l)
-log "Found $total_images images to process"
+total_videos=$(find "$SOURCE_DIR" -type f -regextype posix-extended -iregex ".*\.(${VIDEO_EXTS})" | wc -l)
+total_files=$((total_images + total_videos))
 
-if [ $total_images -eq 0 ]; then
-  log "No images found. Exiting."
+log "Found $total_images images and $total_videos videos to process"
+
+if [ $total_files -eq 0 ]; then
+  log "No files found. Exiting."
   exit 0
 fi
 
-# Process each image
+# Process counters
 processed=0
 failed=0
 
-# Use process substitution instead of pipe to avoid subshell
-while IFS= read -r img_file; do
-  filename=$(basename "$img_file")
+# Process all files (images and videos) recursively
+while IFS= read -r file; do
+  filename=$(basename "$file")
   name_no_ext="${filename%.*}"
   ext="${filename##*.}"
 
-  log "Processing: $filename"
+  # Get relative path from source dir (for folder structure in R2)
+  rel_path=$(dirname "$file" | sed "s|^$SOURCE_DIR||" | sed 's|^/||')
+  r2_prefix=""
+  [ -n "$rel_path" ] && r2_prefix="${rel_path}/"
 
-  # Copy original to working directory
-  cp "$img_file" "$ORIG_DIR/$filename"
+  log "Processing: ${r2_prefix}${filename}"
 
-  # Generate watermarked version
-  if generate_watermark "$ORIG_DIR/$filename" "$WATER_DIR/${name_no_ext}_watermarked.${ext}"; then
-    # Upload watermarked version to R2
-    if upload_to_r2 "$WATER_DIR/${name_no_ext}_watermarked.${ext}" "${name_no_ext}_watermarked.${ext}"; then
-      : $((processed++))
+  # Check if it's a video
+  if echo "$filename" | grep -qiE "\.(${VIDEO_EXTS})$"; then
+    # Process video
+    cp "$file" "$ORIG_DIR/$filename"
+
+    # Extract frame from middle of video
+    if extract_video_frame "$ORIG_DIR/$filename" "$WORK_DIR/frame_${name_no_ext}.jpg"; then
+      # Watermark the extracted frame
+      if generate_watermark "$WORK_DIR/frame_${name_no_ext}.jpg" "$WATER_DIR/${name_no_ext}_preview.jpg"; then
+        # Generate thumbnail from watermarked frame
+        if generate_thumbnail "$WATER_DIR/${name_no_ext}_preview.jpg" "$THUMB_DIR/${name_no_ext}_thumb.jpg"; then
+          # Upload all three: original video, preview, thumbnail
+          upload_to_r2 "$ORIG_DIR/$filename" "${r2_prefix}${filename}" && \
+            upload_to_r2 "$WATER_DIR/${name_no_ext}_preview.jpg" "${r2_prefix}${name_no_ext}_preview.jpg" && \
+            upload_to_r2 "$THUMB_DIR/${name_no_ext}_thumb.jpg" "${r2_prefix}${name_no_ext}_thumb.jpg"
+
+          if [ $? -eq 0 ]; then
+            : $((processed++))
+          else
+            : $((failed++))
+          fi
+        else
+          : $((failed++))
+        fi
+      else
+        : $((failed++))
+      fi
     else
       : $((failed++))
     fi
-  else
-    : $((failed++))
-    continue
-  fi
 
-  # Generate thumbnail
-  if generate_thumbnail "$ORIG_DIR/$filename" "$THUMB_DIR/${name_no_ext}_thumb.${ext}"; then
-    # Upload thumbnail to R2
-    upload_to_r2 "$THUMB_DIR/${name_no_ext}_thumb.${ext}" "${name_no_ext}_thumb.${ext}"
+    # Clean up temp frame
+    rm -f "$WORK_DIR/frame_${name_no_ext}.jpg"
   else
-    : $((failed++))
+    # Process image (existing logic)
+    cp "$file" "$ORIG_DIR/$filename"
+
+    if generate_watermark "$ORIG_DIR/$filename" "$WATER_DIR/${name_no_ext}_watermarked.${ext}"; then
+      if upload_to_r2 "$WATER_DIR/${name_no_ext}_watermarked.${ext}" "${r2_prefix}${name_no_ext}_watermarked.${ext}"; then
+        : $((processed++))
+      else
+        : $((failed++))
+      fi
+    else
+      : $((failed++))
+      continue
+    fi
+
+    if generate_thumbnail "$ORIG_DIR/$filename" "$THUMB_DIR/${name_no_ext}_thumb.${ext}"; then
+      upload_to_r2 "$THUMB_DIR/${name_no_ext}_thumb.${ext}" "${r2_prefix}${name_no_ext}_thumb.${ext}"
+    else
+      : $((failed++))
+    fi
   fi
-done < <(find "$SOURCE_DIR" -type f -regextype posix-extended -iregex ".*\.(${IMAGE_EXTS})" | sort)
+done < <(find "$SOURCE_DIR" -type f -regextype posix-extended -iregex ".*\.(${IMAGE_EXTS}|${VIDEO_EXTS})" | sort)
 
 log "Processed: $processed | Failed: $failed"
 
@@ -115,7 +152,5 @@ push_catalog_to_github
 
 # Cleanup temporary files
 cleanup_temp_files
-
-log "=== Gallery sync complete ==="
 
 log "=== Gallery sync complete ==="

@@ -9,44 +9,122 @@ generate_catalog() {
 
   log "Generating JSON catalog..."
 
-  # Start JSON array
+  # Start JSON structure
   echo "{" > "$catalog_file"
-  echo '  "images": [' >> "$catalog_file"
+  echo '  "categories": {' >> "$catalog_file"
 
-  local first=true
+  local first_category=true
 
-  # Find all image files in source directory
-  find "$source_dir" -type f -regextype posix-extended -iregex ".*\.(${IMAGE_EXTS})" | sort | while read -r img_file; do
-    local filename=$(basename "$img_file")
-    local name_no_ext="${filename%.*}"
-    local ext="${filename##*.}"
+  # Process root-level files (General category)
+  local root_files=$(find "$source_dir" -maxdepth 1 -type f -regextype posix-extended \
+    -iregex ".*\.(${IMAGE_EXTS}|${VIDEO_EXTS})" | sort)
 
-    # R2 public URLs using configured public URL
-    local full_url="${R2_PUBLIC_URL}/${name_no_ext}_watermarked.${ext}"
-    local thumb_url="${R2_PUBLIC_URL}/${name_no_ext}_thumb.${ext}"
-    
-    # Add comma if not first entry
-    if [ "$first" = false ]; then
+  if [ -n "$root_files" ]; then
+    if [ "$first_category" = false ]; then
       echo "    ," >> "$catalog_file"
     fi
-    first=false
+    first_category=false
 
-    # Add JSON entry
-    cat >> "$catalog_file" << EOF
-    {
-      "filename": "$filename",
-      "full": "$full_url",
-      "thumbnail": "$thumb_url"
-    }
-EOF
+    echo "    \"$ROOT_CATEGORY\": [" >> "$catalog_file"
+
+    local first_item=true
+    while IFS= read -r file; do
+      [ -z "$file" ] && continue
+
+      if [ "$first_item" = false ]; then
+        echo "      ," >> "$catalog_file"
+      fi
+      first_item=false
+
+      generate_catalog_entry "$file" "$catalog_file"
+    done <<< "$root_files"
+
+    echo "" >> "$catalog_file"
+    echo "    ]" >> "$catalog_file"
+  fi
+
+  # Process subdirectories as categories
+  find "$source_dir" -mindepth 1 -maxdepth 1 -type d | sort | while read -r category_dir; do
+    local category_name=$(basename "$category_dir")
+    local category_files=$(find "$category_dir" -maxdepth 1 -type f -regextype posix-extended \
+      -iregex ".*\.(${IMAGE_EXTS}|${VIDEO_EXTS})" | sort)
+
+    [ -z "$category_files" ] && continue
+
+    if [ "$first_category" = false ]; then
+      echo "    ," >> "$catalog_file"
+    fi
+    first_category=false
+
+    echo "    \"$category_name\": [" >> "$catalog_file"
+
+    local first_item=true
+    while IFS= read -r file; do
+      [ -z "$file" ] && continue
+
+      if [ "$first_item" = false ]; then
+        echo "      ," >> "$catalog_file"
+      fi
+      first_item=false
+
+      generate_catalog_entry "$file" "$catalog_file"
+    done <<< "$category_files"
+
+    echo "" >> "$catalog_file"
+    echo "    ]" >> "$catalog_file"
   done
 
-  # Close JSON array and object
+  # Close JSON structure
   echo "" >> "$catalog_file"
-  echo '  ]' >> "$catalog_file"
+  echo '  }' >> "$catalog_file"
   echo '}' >> "$catalog_file"
 
   log "Catalog generated: $catalog_file"
+}
+
+generate_catalog_entry() {
+  local file="$1"
+  local catalog_file="$2"
+
+  local filename=$(basename "$file")
+  local name_no_ext="${filename%.*}"
+  local ext="${filename##*.}"
+
+  # Get relative path from source dir (for folder structure)
+  local rel_path=$(dirname "$file" | sed "s|^$SOURCE_DIR||" | sed 's|^/||')
+  local r2_prefix=""
+  [ -n "$rel_path" ] && r2_prefix="${rel_path}/"
+
+  # Check if it's a video
+  if echo "$filename" | grep -qiE "\.(${VIDEO_EXTS})$"; then
+    # Video entry
+    local video_url="${R2_PUBLIC_URL}/${r2_prefix}${filename}"
+    local preview_url="${R2_PUBLIC_URL}/${r2_prefix}${name_no_ext}_preview.jpg"
+    local thumb_url="${R2_PUBLIC_URL}/${r2_prefix}${name_no_ext}_thumb.jpg"
+
+    cat >> "$catalog_file" << EOF
+      {
+        "filename": "$filename",
+        "type": "video",
+        "video": "$video_url",
+        "preview": "$preview_url",
+        "thumbnail": "$thumb_url"
+      }
+EOF
+  else
+    # Image entry
+    local full_url="${R2_PUBLIC_URL}/${r2_prefix}${name_no_ext}_watermarked.${ext}"
+    local thumb_url="${R2_PUBLIC_URL}/${r2_prefix}${name_no_ext}_thumb.${ext}"
+
+    cat >> "$catalog_file" << EOF
+      {
+        "filename": "$filename",
+        "type": "image",
+        "full": "$full_url",
+        "thumbnail": "$thumb_url"
+      }
+EOF
+  fi
 }
 
 push_catalog_to_github() {

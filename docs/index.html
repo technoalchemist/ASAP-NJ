@@ -64,11 +64,43 @@
             </a>
         </div>
         <section id="gallery-section">
-            <h2>Gallery</h2>
+            <h2>Our Work, Our Passion</h2>
+            <!-- Featured rotating hero image -->
+            <div id="featured-container">
+                <a id="featured-image" href="" data-pswp-width="1920" data-pswp-height="1080">
+                    <img src="" alt="" loading="eager">
+                </a>
+            </div>
+            <!-- Thumbnail grid -->
             <div id="gallery" class="gallery-grid"></div>
         </section>
-
         <style>
+            #featured-container {
+                max-width: 1160px;
+                margin: 0 auto 2rem;
+                padding: 0 1rem;
+            }
+
+            #featured-image {
+                display: block;
+                overflow: hidden;
+                border-radius: 12px;
+                box-shadow: 0 8px 24px rgba(255,255,255,0.1);
+                transition: transform 0.3s ease;
+            }
+
+            #featured-image:hover {
+                transform: scale(1.02);
+            }
+
+            #featured-image img {
+                width: 100%;
+                height: 500px;
+                object-fit: cover;
+                display: block;
+                transition: opacity 0.5s ease;
+            }
+
             .gallery-grid {
                 display: grid;
                 grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -112,33 +144,52 @@
         <footer>
             <p>Copyright © 2025 Aerial Surveying and Photography - All Rights Reserved.</p>
         </footer>
-        <!-- PhotoSwipe JS -->
         <script type="module">
             import PhotoSwipeLightbox from 'https://cdn.jsdelivr.net/npm/photoswipe@5.4.3/dist/photoswipe-lightbox.esm.js';
             import PhotoSwipe from 'https://cdn.jsdelivr.net/npm/photoswipe@5.4.3/dist/photoswipe.esm.js';
-
-            // Initialize gallery
-            const lightbox = new PhotoSwipeLightbox({
-                gallery: '#gallery',
-                children: 'a',
-                pswpModule: PhotoSwipe,
-                preload: [1, 2]  // Preload 1 image before and 2 after
-            });
-
-            lightbox.init();
 
             // Load gallery data from JSON
             fetch('./gallery-data.json')
                 .then(response => response.json())
                 .then(data => {
-                    const gallery = document.getElementById('gallery');
+                    if (!data.images || data.images.length === 0) {
+                        console.log('No images found in gallery');
+                        return;
+                    }
 
+                    const gallery = document.getElementById('gallery');
+                    const featuredLink = document.getElementById('featured-image');
+                    const featuredImg = featuredLink.querySelector('img');
+                    let currentIndex = 0;
+
+                    // Function to update featured image
+                    function updateFeatured(index) {
+                        const img = data.images[index];
+                        featuredImg.style.opacity = '0';
+
+                        setTimeout(() => {
+                            featuredLink.href = img.full;
+                            featuredImg.src = img.full;
+                            featuredImg.alt = img.filename;
+                            featuredImg.style.opacity = '1';
+                        }, 250);
+                    }
+
+                    // Initialize first featured image
+                    updateFeatured(0);
+
+                    // Rotate featured image every 4 seconds
+                    setInterval(() => {
+                        currentIndex = (currentIndex + 1) % data.images.length;
+                        updateFeatured(currentIndex);
+                    }, 4000);
+
+                    // Populate thumbnail grid
                     data.images.forEach(img => {
                         const link = document.createElement('a');
                         link.href = img.full;
-                        link.dataset.pswpWidth = 1920;  // Adjust based on your actual image sizes
+                        link.dataset.pswpWidth = 1920;
                         link.dataset.pswpHeight = 1080;
-                        link.target = '_blank';
 
                         const thumb = document.createElement('img');
                         thumb.src = img.thumbnail;
@@ -148,6 +199,16 @@
                         link.appendChild(thumb);
                         gallery.appendChild(link);
                     });
+
+                    // Initialize PhotoSwipe for both featured and grid
+                    const lightbox = new PhotoSwipeLightbox({
+                        gallery: '#gallery-section',
+                        children: 'a',
+                        pswpModule: PhotoSwipe,
+                        preload: [1, 2]
+                    });
+
+                    lightbox.init();
                 })
                 .catch(error => console.error('Error loading gallery:', error));
         </script>
