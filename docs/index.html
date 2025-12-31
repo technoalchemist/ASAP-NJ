@@ -32,6 +32,8 @@
             .social-links a:hover { transform: scale(1.1); }
             .social-links svg { width: 44px; height: 44px; }
         </style>
+        <!-- PhotoSwipe CSS -->
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/photoswipe@5.4.3/dist/photoswipe.css">
     </head>
     <body>
         <section class="hero">
@@ -61,6 +63,37 @@
                 </svg>
             </a>
         </div>
+        <section id="gallery-section">
+            <h2>Gallery</h2>
+            <div id="gallery" class="gallery-grid"></div>
+        </section>
+
+        <style>
+            .gallery-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+                gap: 1rem;
+                padding: 1rem;
+            }
+
+            .gallery-grid a {
+                display: block;
+                overflow: hidden;
+                border-radius: 8px;
+                transition: transform 0.2s;
+            }
+
+            .gallery-grid a:hover {
+                transform: scale(1.05);
+            }
+
+            .gallery-grid img {
+                width: 100%;
+                height: 300px;
+                object-fit: cover;
+                display: block;
+            }
+        </style>
         <div class="contact-form">
             <h2>Contact Us</h2>
             <form action="https://formspree.io/f/xldpaodl" method="POST">
@@ -77,7 +110,46 @@
             </form>
         </div>
         <footer>
-            <p>Copyright © 2025 Aerial surveying and photography - All Rights Reserved.</p>
+            <p>Copyright © 2025 Aerial Surveying and Photography - All Rights Reserved.</p>
         </footer>
+        <!-- PhotoSwipe JS -->
+        <script type="module">
+            import PhotoSwipeLightbox from 'https://cdn.jsdelivr.net/npm/photoswipe@5.4.3/dist/photoswipe-lightbox.esm.js';
+            import PhotoSwipe from 'https://cdn.jsdelivr.net/npm/photoswipe@5.4.3/dist/photoswipe.esm.js';
+
+            // Initialize gallery
+            const lightbox = new PhotoSwipeLightbox({
+                gallery: '#gallery',
+                children: 'a',
+                pswpModule: PhotoSwipe,
+                preload: [1, 2]  // Preload 1 image before and 2 after
+            });
+
+            lightbox.init();
+
+            // Load gallery data from JSON
+            fetch('gallery-data.json')
+                .then(response => response.json())
+                .then(data => {
+                    const gallery = document.getElementById('gallery');
+
+                    data.images.forEach(img => {
+                        const link = document.createElement('a');
+                        link.href = img.full;
+                        link.dataset.pswpWidth = 1920;  // Adjust based on your actual image sizes
+                        link.dataset.pswpHeight = 1080;
+                        link.target = '_blank';
+
+                        const thumb = document.createElement('img');
+                        thumb.src = img.thumbnail;
+                        thumb.alt = img.filename;
+                        thumb.loading = 'lazy';
+
+                        link.appendChild(thumb);
+                        gallery.appendChild(link);
+                    });
+                })
+                .catch(error => console.error('Error loading gallery:', error));
+        </script>
     </body>
 </html>
