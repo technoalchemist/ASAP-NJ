@@ -128,7 +128,7 @@
             lightbox.init();
 
             // Load gallery data from JSON
-            fetch('gallery-data.json')
+            fetch('./gallery-data.json')
                 .then(response => response.json())
                 .then(data => {
                     const gallery = document.getElementById('gallery');

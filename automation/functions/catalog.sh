@@ -9,10 +9,6 @@ generate_catalog() {
 
   log "Generating JSON catalog..."
 
-  # Extract account ID from R2 endpoint
-  # Format: https://<account-id>.r2.cloudflarestorage.com
-  local account_id=$(echo "$R2_ENDPOINT" | sed -n 's|https://\([^.]*\)\.r2\.cloudflarestorage\.com|\1|p')
-
   # Start JSON array
   echo "{" > "$catalog_file"
   echo '  "images": [' >> "$catalog_file"
@@ -25,10 +21,10 @@ generate_catalog() {
     local name_no_ext="${filename%.*}"
     local ext="${filename##*.}"
 
-    # R2 public URLs
-    local full_url="https://pub-${account_id}.r2.dev/${name_no_ext}_watermarked.${ext}"
-    local thumb_url="https://pub-${account_id}.r2.dev/${name_no_ext}_thumb.${ext}"
-
+    # R2 public URLs using configured public URL
+    local full_url="${R2_PUBLIC_URL}/${name_no_ext}_watermarked.${ext}"
+    local thumb_url="${R2_PUBLIC_URL}/${name_no_ext}_thumb.${ext}"
+    
     # Add comma if not first entry
     if [ "$first" = false ]; then
       echo "    ," >> "$catalog_file"
