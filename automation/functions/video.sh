@@ -16,6 +16,15 @@ extract_video_frame() {
     return 1
   fi
 
+  # Check if video exceeds 3 minutes (180 seconds)
+  local max_duration=180
+  local duration_int=$(printf "%.0f" "$duration")
+
+  if [ "$duration_int" -gt "$max_duration" ]; then
+    log "  SKIPPED: Video exceeds 3-minute limit (${duration_int}s): $(basename "$video_file")"
+    return 2  # Return 2 to indicate "skipped" vs "failed"
+  fi
+
   # Calculate middle timestamp
   local middle=$(echo "$duration / 2" | bc)
 
@@ -24,7 +33,7 @@ extract_video_frame() {
     -loglevel error 2>&1 | tee -a "$LOG_FILE"
 
   if [ ${PIPESTATUS[0]} -eq 0 ]; then
-    log "  Extracted frame from video: $(basename "$video_file")"
+    log "  Extracted frame from video: $(basename "$video_file") (${duration_int}s)"
     return 0
   else
     log "  ERROR: Failed to extract frame from $(basename "$video_file")"

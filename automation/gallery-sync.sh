@@ -35,6 +35,7 @@ source "$R2_CREDS"
 # Source functions
 source "$SCRIPT_DIR/functions/catalog.sh"
 source "$SCRIPT_DIR/functions/cleanup.sh"
+source "$SCRIPT_DIR/functions/sync.sh"
 source "$SCRIPT_DIR/functions/thumbnail.sh"
 source "$SCRIPT_DIR/functions/upload.sh"
 source "$SCRIPT_DIR/functions/video.sh"
@@ -69,9 +70,10 @@ if [ $total_files -eq 0 ]; then
   exit 0
 fi
 
-# Process counters
-processed=0
+# Process
 failed=0
+processed=0
+skipped=0
 
 # Process all files (images and videos) recursively
 while IFS= read -r file; do
@@ -84,6 +86,12 @@ while IFS= read -r file; do
   r2_prefix=""
   [ -n "$rel_path" ] && r2_prefix="${rel_path}/"
 
+  # Check if file needs processing (change detection)
+  if ! needs_processing "$file" "${r2_prefix}${filename}"; then
+    log "  Skipping (already processed): ${r2_prefix}${filename}"
+    continue
+  fi
+
   log "Processing: ${r2_prefix}${filename}"
 
   # Check if it's a video
@@ -91,22 +99,33 @@ while IFS= read -r file; do
     # Process video
     cp "$file" "$ORIG_DIR/$filename"
 
-    # Extract frame from middle of video
-    if extract_video_frame "$ORIG_DIR/$filename" "$WORK_DIR/frame_${name_no_ext}.jpg"; then
-      # Watermark the extracted frame
-      if generate_watermark "$WORK_DIR/frame_${name_no_ext}.jpg" "$WATER_DIR/${name_no_ext}_preview.jpg"; then
-        # Generate thumbnail from watermarked frame
-        if generate_thumbnail "$WATER_DIR/${name_no_ext}_preview.jpg" "$THUMB_DIR/${name_no_ext}_thumb.jpg"; then
-          # Upload all three: original video, preview, thumbnail
-          upload_to_r2 "$ORIG_DIR/$filename" "${r2_prefix}${filename}" && \
-            upload_to_r2 "$WATER_DIR/${name_no_ext}_preview.jpg" "${r2_prefix}${name_no_ext}_preview.jpg" && \
-            upload_to_r2 "$THUMB_DIR/${name_no_ext}_thumb.jpg" "${r2_prefix}${name_no_ext}_thumb.jpg"
+    # Extract frame from middle of video (returns 2 if video too long)
+    extract_result=0
+    extract_video_frame "$ORIG_DIR/$filename" "$WORK_DIR/frame_${name_no_ext}.jpg" || extract_result=$?
 
-          if [ $? -eq 0 ]; then
-            : $((processed++))
-          else
-            : $((failed++))
-          fi
+    if [ $extract_result -eq 2 ]; then
+      # Video too long, skip
+      : $((skipped++))
+      rm -f "$ORIG_DIR/$filename"
+      continue
+    elif [ $extract_result -ne 0 ]; then
+      # Extraction failed
+      : $((failed++))
+      rm -f "$ORIG_DIR/$filename"
+      continue
+    fi
+
+    # Watermark the extracted frame
+    if generate_watermark "$WORK_DIR/frame_${name_no_ext}.jpg" "$WATER_DIR/${name_no_ext}_preview.jpg"; then
+      # Generate thumbnail from watermarked frame
+      if generate_thumbnail "$WATER_DIR/${name_no_ext}_preview.jpg" "$THUMB_DIR/${name_no_ext}_thumb.jpg"; then
+        # Upload all three: original video, preview, thumbnail
+        upload_to_r2 "$ORIG_DIR/$filename" "${r2_prefix}${filename}" && \
+          upload_to_r2 "$WATER_DIR/${name_no_ext}_preview.jpg" "${r2_prefix}${name_no_ext}_preview.jpg" && \
+          upload_to_r2 "$THUMB_DIR/${name_no_ext}_thumb.jpg" "${r2_prefix}${name_no_ext}_thumb.jpg"
+
+        if [ $? -eq 0 ]; then
+          : $((processed++))
         else
           : $((failed++))
         fi
@@ -120,7 +139,7 @@ while IFS= read -r file; do
     # Clean up temp frame
     rm -f "$WORK_DIR/frame_${name_no_ext}.jpg"
   else
-    # Process image (existing logic)
+    # Process image (existing logic with change detection)
     cp "$file" "$ORIG_DIR/$filename"
 
     if generate_watermark "$ORIG_DIR/$filename" "$WATER_DIR/${name_no_ext}_watermarked.${ext}"; then
@@ -142,7 +161,10 @@ while IFS= read -r file; do
   fi
 done < <(find "$SOURCE_DIR" -type f -regextype posix-extended -iregex ".*\.(${IMAGE_EXTS}|${VIDEO_EXTS})" | sort)
 
-log "Processed: $processed | Failed: $failed"
+log "Processed: $processed | Failed: $failed | Skipped: $skipped"
+
+# Sync deletions
+sync_deletions
 
 # Generate JSON catalog
 generate_catalog "$SOURCE_DIR" "$CATALOG_FILE"
