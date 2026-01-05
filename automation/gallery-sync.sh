@@ -70,10 +70,23 @@ if [ $total_files -eq 0 ]; then
   exit 0
 fi
 
-# Process
+# Auto-enable incremental publishing for large workloads
+INCREMENTAL_PUBLISH="false"
+if [ $total_images -gt 25 ] || [ $total_videos -gt 5 ]; then
+  INCREMENTAL_PUBLISH="true"
+  log "Large workload detected (${total_images} images, ${total_videos} videos) - enabling incremental publishing"
+fi
+
+# Cache R2 files for fast change detection
+cache_r2_files
+
+# Process counters
 failed=0
 processed=0
 skipped=0
+
+# Track folder changes for incremental publishing
+current_folder=""
 
 # Process all files (images and videos) recursively
 while IFS= read -r file; do
@@ -85,6 +98,20 @@ while IFS= read -r file; do
   rel_path=$(dirname "$file" | sed "s|^$SOURCE_DIR||" | sed 's|^/||')
   r2_prefix=""
   [ -n "$rel_path" ] && r2_prefix="${rel_path}/"
+
+  # Incremental publishing: check if we've moved to a new folder
+  if [ "$INCREMENTAL_PUBLISH" = "true" ]; then
+    this_folder="$rel_path"
+
+    if [ "$this_folder" != "$current_folder" ] && [ -n "$current_folder" ]; then
+      # New folder - publish what we have so far
+      log "Publishing progress (completed folder: $current_folder)..."
+      generate_catalog "$SOURCE_DIR" "$CATALOG_FILE"
+      push_catalog_to_github
+    fi
+
+    current_folder="$this_folder"
+  fi
 
   # Check if file needs processing (change detection)
   if ! needs_processing "$file" "${r2_prefix}${filename}"; then
@@ -134,7 +161,7 @@ while IFS= read -r file; do
       : $((failed++))
     fi
   else
-    # Process image (existing logic with change detection)
+    # Process image
     cp "$file" "$ORIG_DIR/$filename"
 
     if generate_watermark "$ORIG_DIR/$filename" "$WATER_DIR/${name_no_ext}_watermarked.${ext}"; then
@@ -158,13 +185,13 @@ done < <(find "$SOURCE_DIR" -type f -regextype posix-extended -iregex ".*\.(${IM
 
 log "Processed: $processed | Failed: $failed | Skipped: $skipped"
 
-# Sync deletions
-sync_deletions
+# Sync deletions (temporarily disabled)
+# sync_deletions
 
-# Generate JSON catalog
+# Generate JSON catalog (final)
 generate_catalog "$SOURCE_DIR" "$CATALOG_FILE"
 
-# Push catalog to GitHub
+# Push catalog to GitHub (final)
 push_catalog_to_github
 
 # Cleanup temporary files

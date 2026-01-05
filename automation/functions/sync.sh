@@ -3,14 +3,18 @@
 # File synchronization and change detection functions
 #
 
-get_file_hash() {
-  local file="$1"
-  md5sum "$file" | awk '{print $1}'
-}
+# Global variable to cache R2 file list
+R2_FILE_CACHE=""
 
-get_file_timestamp() {
-  local file="$1"
-  stat -c %Y "$file" 2>/dev/null || stat -f %m "$file" 2>/dev/null
+cache_r2_files() {
+  log "Caching R2 file list for fast change detection..."
+  R2_FILE_CACHE=$(aws s3 ls "s3://${R2_BUCKET}/" \
+    --endpoint-url "$R2_ENDPOINT" \
+    --recursive \
+    | awk '{print $4}')
+
+  local file_count=$(echo "$R2_FILE_CACHE" | grep -v '^$' | wc -l)
+  log "Cached $file_count files from R2"
 }
 
 needs_processing() {
@@ -28,32 +32,23 @@ needs_processing() {
   [ -n "$dir_path" ] && dir_path="${dir_path}/"
 
   # Determine what to check based on file type
+  local check_file=""
   if echo "$filename" | grep -qiE "\.(${VIDEO_EXTS})$"; then
     # For videos, check if the video file itself exists
-    aws s3 ls "s3://${R2_BUCKET}/${r2_path}" \
-      --endpoint-url "$R2_ENDPOINT" &>/dev/null
+    check_file="${r2_path}"
   else
     # For images, check if watermarked version exists
-    aws s3 ls "s3://${R2_BUCKET}/${dir_path}${name_no_ext}_watermarked.${ext}" \
-      --endpoint-url "$R2_ENDPOINT" &>/dev/null
+    check_file="${dir_path}${name_no_ext}_watermarked.${ext}"
   fi
 
-  if [ $? -ne 0 ]; then
-    # File doesn't exist in R2, needs processing
-    return 0
+  # Check against cached R2 file list
+  if echo "$R2_FILE_CACHE" | grep -qF "$check_file"; then
+    # File exists in R2, skip
+    return 1
   fi
 
-  # File exists in R2, skip
-  return 1
-}
-
-list_r2_files_in_path() {
-  local path_prefix="$1"
-
-  aws s3 ls "s3://${R2_BUCKET}/${path_prefix}" \
-    --endpoint-url "$R2_ENDPOINT" \
-    --recursive \
-    | awk '{print $4}'
+  # File doesn't exist in R2, needs processing
+  return 0
 }
 
 sync_deletions() {
@@ -62,11 +57,7 @@ sync_deletions() {
   local deleted_count=0
 
   # Get all original files currently in R2 (not watermarked/thumb/preview versions)
-  local r2_files=$(aws s3 ls "s3://${R2_BUCKET}/" \
-    --endpoint-url "$R2_ENDPOINT" \
-    --recursive \
-    | awk '{print $4}' \
-    | grep -vE "_(watermarked|thumb|preview)\.(jpg|jpeg|png|gif|webp)$")
+  local r2_files=$(echo "$R2_FILE_CACHE" | grep -vE "_(watermarked|thumb|preview)\.(jpg|jpeg|png|gif|webp)$")
 
   # Check each R2 original file to see if source still exists
   while IFS= read -r r2_file; do
