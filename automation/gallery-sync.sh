@@ -99,45 +99,40 @@ while IFS= read -r file; do
     # Process video
     cp "$file" "$ORIG_DIR/$filename"
 
-    # Extract frame from middle of video (returns 2 if video too long)
-    extract_result=0
-    extract_video_frame "$ORIG_DIR/$filename" "$WORK_DIR/frame_${name_no_ext}.jpg" || extract_result=$?
+    # Process/trim video if needed
+    if process_video "$ORIG_DIR/$filename" "$WORK_DIR/${filename}"; then
+      # Extract frame from the processed video
+      if extract_video_frame "$WORK_DIR/${filename}" "$WORK_DIR/frame_${name_no_ext}.jpg"; then
+        # Watermark the extracted frame
+        if generate_watermark "$WORK_DIR/frame_${name_no_ext}.jpg" "$WATER_DIR/${name_no_ext}_preview.jpg"; then
+          # Generate thumbnail from watermarked frame
+          if generate_thumbnail "$WATER_DIR/${name_no_ext}_preview.jpg" "$THUMB_DIR/${name_no_ext}_thumb.jpg"; then
+            # Upload all three: processed video, preview, thumbnail
+            upload_to_r2 "$WORK_DIR/${filename}" "${r2_prefix}${filename}" && \
+              upload_to_r2 "$WATER_DIR/${name_no_ext}_preview.jpg" "${r2_prefix}${name_no_ext}_preview.jpg" && \
+              upload_to_r2 "$THUMB_DIR/${name_no_ext}_thumb.jpg" "${r2_prefix}${name_no_ext}_thumb.jpg"
 
-    if [ $extract_result -eq 2 ]; then
-      # Video too long, skip
-      : $((skipped++))
-      rm -f "$ORIG_DIR/$filename"
-      continue
-    elif [ $extract_result -ne 0 ]; then
-      # Extraction failed
-      : $((failed++))
-      rm -f "$ORIG_DIR/$filename"
-      continue
-    fi
-
-    # Watermark the extracted frame
-    if generate_watermark "$WORK_DIR/frame_${name_no_ext}.jpg" "$WATER_DIR/${name_no_ext}_preview.jpg"; then
-      # Generate thumbnail from watermarked frame
-      if generate_thumbnail "$WATER_DIR/${name_no_ext}_preview.jpg" "$THUMB_DIR/${name_no_ext}_thumb.jpg"; then
-        # Upload all three: original video, preview, thumbnail
-        upload_to_r2 "$ORIG_DIR/$filename" "${r2_prefix}${filename}" && \
-          upload_to_r2 "$WATER_DIR/${name_no_ext}_preview.jpg" "${r2_prefix}${name_no_ext}_preview.jpg" && \
-          upload_to_r2 "$THUMB_DIR/${name_no_ext}_thumb.jpg" "${r2_prefix}${name_no_ext}_thumb.jpg"
-
-        if [ $? -eq 0 ]; then
-          : $((processed++))
+            if [ $? -eq 0 ]; then
+              : $((processed++))
+            else
+              : $((failed++))
+            fi
+          else
+            : $((failed++))
+          fi
         else
           : $((failed++))
         fi
       else
         : $((failed++))
       fi
+
+      # Clean up temp files
+      rm -f "$WORK_DIR/frame_${name_no_ext}.jpg"
+      rm -f "$WORK_DIR/${filename}"
     else
       : $((failed++))
     fi
-
-    # Clean up temp frame
-    rm -f "$WORK_DIR/frame_${name_no_ext}.jpg"
   else
     # Process image (existing logic with change detection)
     cp "$file" "$ORIG_DIR/$filename"

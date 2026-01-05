@@ -17,19 +17,33 @@ needs_processing() {
   local local_file="$1"
   local r2_path="$2"
 
-  # Check if file exists in R2
-  aws s3 ls "s3://${R2_BUCKET}/${r2_path}" \
-    --endpoint-url "$R2_ENDPOINT" &>/dev/null
+  # Extract filename parts
+  local filename=$(basename "$r2_path")
+  local name_no_ext="${filename%.*}"
+  local ext="${filename##*.}"
+
+  # Get directory path
+  local dir_path=$(dirname "$r2_path")
+  [ "$dir_path" = "." ] && dir_path=""
+  [ -n "$dir_path" ] && dir_path="${dir_path}/"
+
+  # Determine what to check based on file type
+  if echo "$filename" | grep -qiE "\.(${VIDEO_EXTS})$"; then
+    # For videos, check if the video file itself exists
+    aws s3 ls "s3://${R2_BUCKET}/${r2_path}" \
+      --endpoint-url "$R2_ENDPOINT" &>/dev/null
+  else
+    # For images, check if watermarked version exists
+    aws s3 ls "s3://${R2_BUCKET}/${dir_path}${name_no_ext}_watermarked.${ext}" \
+      --endpoint-url "$R2_ENDPOINT" &>/dev/null
+  fi
 
   if [ $? -ne 0 ]; then
     # File doesn't exist in R2, needs processing
     return 0
   fi
 
-  # File exists in R2 - check if local file is newer
-  # For now, we'll reprocess if file exists locally
-  # More sophisticated: compare timestamps or hashes
-  # But for Gary's use case, if it's in R2, skip it
+  # File exists in R2, skip
   return 1
 }
 
