@@ -61,20 +61,16 @@ sync_deletions() {
 
   local deleted_count=0
 
-  # Get all files currently in R2
+  # Get all original files currently in R2 (not watermarked/thumb/preview versions)
   local r2_files=$(aws s3 ls "s3://${R2_BUCKET}/" \
     --endpoint-url "$R2_ENDPOINT" \
     --recursive \
-    | awk '{print $4}')
+    | awk '{print $4}' \
+    | grep -vE "_(watermarked|thumb|preview)\.(jpg|jpeg|png|gif|webp)$")
 
-  # Check each R2 file to see if source still exists
+  # Check each R2 original file to see if source still exists
   while IFS= read -r r2_file; do
     [ -z "$r2_file" ] && continue
-
-    # Skip if it's a watermarked/thumb/preview file - we only check originals
-    if echo "$r2_file" | grep -qE "_(watermarked|thumb|preview)\.(jpg|jpeg|png|gif|webp)$"; then
-      continue
-    fi
 
     # Construct expected source path
     local source_file="${SOURCE_DIR}/${r2_file}"
@@ -83,17 +79,22 @@ sync_deletions() {
       # Source file no longer exists, delete from R2
       log "  Deleting: $r2_file (source file removed)"
 
+      # Get file info for cleanup
+      local dir_path=$(dirname "$r2_file")
+      local filename=$(basename "$r2_file")
+      local name_no_ext="${filename%.*}"
+      local ext="${filename##*.}"
+
+      [ "$dir_path" = "." ] && dir_path=""
+      [ -n "$dir_path" ] && dir_path="${dir_path}/"
+
       # Delete original
       delete_from_r2 "$r2_file"
 
-      # Delete associated files (watermarked, thumb, preview)
-      local base_name="${r2_file%.*}"
-      local ext="${r2_file##*.}"
-
-      delete_from_r2 "${base_name}_watermarked.${ext}" 2>/dev/null
-      delete_from_r2 "${base_name}_thumb.${ext}" 2>/dev/null
-      delete_from_r2 "${base_name}_thumb.jpg" 2>/dev/null
-      delete_from_r2 "${base_name}_preview.jpg" 2>/dev/null
+      # Delete associated processed files
+      delete_from_r2 "${dir_path}${name_no_ext}_watermarked.${ext}" 2>/dev/null
+      delete_from_r2 "${dir_path}${name_no_ext}_thumb.${ext}" 2>/dev/null
+      delete_from_r2 "${dir_path}${name_no_ext}_preview.jpg" 2>/dev/null
 
       : $((deleted_count++))
     fi
