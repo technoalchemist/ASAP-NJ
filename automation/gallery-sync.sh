@@ -116,6 +116,7 @@ while IFS= read -r file; do
   # Check if file needs processing (change detection)
   if ! needs_processing "$file" "${r2_prefix}${filename}"; then
     log "  Skipping (already processed): ${r2_prefix}${filename}"
+    : $((skipped++))
     continue
   fi
 

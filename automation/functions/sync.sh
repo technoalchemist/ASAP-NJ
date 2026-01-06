@@ -11,7 +11,7 @@ cache_r2_files() {
   R2_FILE_CACHE=$(aws s3 ls "s3://${R2_BUCKET}/" \
     --endpoint-url "$R2_ENDPOINT" \
     --recursive \
-    | awk '{print $4}')
+    | awk '{$1=$2=$3=""; print substr($0,4)}')
 
   local file_count=$(echo "$R2_FILE_CACHE" | grep -v '^$' | wc -l)
   log "Cached $file_count files from R2"
