@@ -56,19 +56,26 @@ sync_deletions() {
 
   local deleted_count=0
 
-  # Get all original files currently in R2 (not watermarked/thumb/preview versions)
-  local r2_files=$(echo "$R2_FILE_CACHE" | grep -vE "_(watermarked|thumb|preview)\.(jpg|jpeg|png|gif|webp)$")
+  # Get all files from R2 cache
+  # Filter to only original files (not _watermarked, _thumb, _preview)
+  local r2_originals=$(echo "$R2_FILE_CACHE" | grep -v -E "_(watermarked|thumb|preview)\.")
 
-  # Check each R2 original file to see if source still exists
+  # Check each original file to see if source still exists
   while IFS= read -r r2_file; do
     [ -z "$r2_file" ] && continue
+
+    # Skip if this looks like a malformed entry (no extension or path)
+    if ! echo "$r2_file" | grep -qE '\.[a-zA-Z0-9]+$'; then
+      log "  Skipping malformed R2 entry: '$r2_file'"
+      continue
+    fi
 
     # Construct expected source path
     local source_file="${SOURCE_DIR}/${r2_file}"
 
     if [ ! -f "$source_file" ]; then
       # Source file no longer exists, delete from R2
-      log "  Deleting: $r2_file (source file removed)"
+      log "  Source removed, deleting from R2: $r2_file"
 
       # Get file info for cleanup
       local dir_path=$(dirname "$r2_file")
@@ -82,14 +89,15 @@ sync_deletions() {
       # Delete original
       delete_from_r2 "$r2_file"
 
-      # Delete associated processed files
-      delete_from_r2 "${dir_path}${name_no_ext}_watermarked.${ext}" 2>/dev/null
-      delete_from_r2 "${dir_path}${name_no_ext}_thumb.${ext}" 2>/dev/null
-      delete_from_r2 "${dir_path}${name_no_ext}_preview.jpg" 2>/dev/null
+      # Delete associated processed files (ignore errors if they don't exist)
+      delete_from_r2 "${dir_path}${name_no_ext}_watermarked.${ext}" 2>/dev/null || true
+      delete_from_r2 "${dir_path}${name_no_ext}_thumb.${ext}" 2>/dev/null || true
+      delete_from_r2 "${dir_path}${name_no_ext}_thumb.jpg" 2>/dev/null || true
+      delete_from_r2 "${dir_path}${name_no_ext}_preview.jpg" 2>/dev/null || true
 
       : $((deleted_count++))
     fi
-  done <<< "$r2_files"
+  done <<< "$r2_originals"
 
   log "Deleted $deleted_count file(s) from R2"
 }

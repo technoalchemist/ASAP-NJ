@@ -187,7 +187,7 @@ done < <(find "$SOURCE_DIR" -type f -regextype posix-extended -iregex ".*\.(${IM
 log "Processed: $processed | Failed: $failed | Skipped: $skipped"
 
 # Sync deletions (temporarily disabled)
-# sync_deletions
+sync_deletions
 
 # Generate JSON catalog (final)
 generate_catalog "$SOURCE_DIR" "$CATALOG_FILE"
