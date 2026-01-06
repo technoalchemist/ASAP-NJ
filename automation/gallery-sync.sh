@@ -77,9 +77,6 @@ if [ $total_images -gt 25 ] || [ $total_videos -gt 5 ]; then
   log "Large workload detected (${total_images} images, ${total_videos} videos) - enabling incremental publishing"
 fi
 
-# Cache R2 files for fast change detection
-cache_r2_files
-
 # Process counters
 failed=0
 processed=0
@@ -186,7 +183,12 @@ done < <(find "$SOURCE_DIR" -type f -regextype posix-extended -iregex ".*\.(${IM
 
 log "Processed: $processed | Failed: $failed | Skipped: $skipped"
 
-# Sync deletions (temporarily disabled)
+log "Processed: $processed | Failed: $failed | Skipped: $skipped"
+
+# Refresh R2 cache before checking deletions (picks up newly uploaded files) for fast change detection
+cache_r2_files
+
+# Sync deletions
 sync_deletions
 
 # Generate JSON catalog (final)

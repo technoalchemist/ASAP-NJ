@@ -95,12 +95,17 @@ generate_catalog_entry() {
   local r2_prefix=""
   [ -n "$rel_path" ] && r2_prefix="${rel_path}/"
 
+  # URL-encode spaces and special characters
+  local encoded_prefix=$(echo "${r2_prefix}" | sed 's/ /%20/g')
+  local encoded_name=$(echo "${name_no_ext}" | sed 's/ /%20/g')
+
   # Check if it's a video
   if echo "$filename" | grep -qiE "\.(${VIDEO_EXTS})$"; then
-    # Video entry
-    local video_url="${R2_PUBLIC_URL}/${r2_prefix}${filename}"
-    local preview_url="${R2_PUBLIC_URL}/${r2_prefix}${name_no_ext}_preview.jpg"
-    local thumb_url="${R2_PUBLIC_URL}/${r2_prefix}${name_no_ext}_thumb.jpg"
+    # Video entry - URL-encode filename too
+    local encoded_filename=$(echo "${filename}" | sed 's/ /%20/g')
+    local video_url="${R2_PUBLIC_URL}/${encoded_prefix}${encoded_filename}"
+    local preview_url="${R2_PUBLIC_URL}/${encoded_prefix}${encoded_name}_preview.jpg"
+    local thumb_url="${R2_PUBLIC_URL}/${encoded_prefix}${encoded_name}_thumb.jpg"
 
     cat >> "$catalog_file" << EOF
       {
@@ -113,8 +118,8 @@ generate_catalog_entry() {
 EOF
   else
     # Image entry
-    local full_url="${R2_PUBLIC_URL}/${r2_prefix}${name_no_ext}_watermarked.${ext}"
-    local thumb_url="${R2_PUBLIC_URL}/${r2_prefix}${name_no_ext}_thumb.${ext}"
+    local full_url="${R2_PUBLIC_URL}/${encoded_prefix}${encoded_name}_watermarked.${ext}"
+    local thumb_url="${R2_PUBLIC_URL}/${encoded_prefix}${encoded_name}_thumb.${ext}"
 
     cat >> "$catalog_file" << EOF
       {
