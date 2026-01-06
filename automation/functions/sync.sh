@@ -56,48 +56,40 @@ sync_deletions() {
 
   local deleted_count=0
 
-  # Get all files from R2 cache
-  # Filter to only original files (not _watermarked, _thumb, _preview)
-  local r2_originals=$(echo "$R2_FILE_CACHE" | grep -v -E "_(watermarked|thumb|preview)\.")
+  # Build list of what SHOULD be in R2 based on current source files
+  local expected_files=""
 
-  # Check each original file to see if source still exists
+  while IFS= read -r source_file; do
+    local filename=$(basename "$source_file")
+    local name_no_ext="${filename%.*}"
+    local ext="${filename##*.}"
+    local rel_path=$(dirname "$source_file" | sed "s|^$SOURCE_DIR||" | sed 's|^/||')
+    local r2_prefix=""
+    [ -n "$rel_path" ] && r2_prefix="${rel_path}/"
+
+    # Add expected R2 files for this source file
+    if echo "$filename" | grep -qiE "\.(${VIDEO_EXTS})$"; then
+      # Video: original + preview + thumb
+      expected_files="${expected_files}${r2_prefix}${filename}"
+      expected_files="${expected_files}${r2_prefix}${name_no_ext}_preview.jpg"
+      expected_files="${expected_files}${r2_prefix}${name_no_ext}_thumb.jpg"
+    else
+      # Image: watermarked + thumb
+      expected_files="${expected_files}${r2_prefix}${name_no_ext}_watermarked.${ext}"
+      expected_files="${expected_files}${r2_prefix}${name_no_ext}_thumb.${ext}"
+    fi
+  done < <(find "$SOURCE_DIR" -type f -regextype posix-extended -iregex ".*\.(${IMAGE_EXTS}|${VIDEO_EXTS})")
+
+  # Check each R2 file - if not in expected list, delete it
   while IFS= read -r r2_file; do
     [ -z "$r2_file" ] && continue
 
-    # Skip if this looks like a malformed entry (no extension or path)
-    if ! echo "$r2_file" | grep -qE '\.[a-zA-Z0-9]+$'; then
-      log "  Skipping malformed R2 entry: '$r2_file'"
-      continue
-    fi
-
-    # Construct expected source path
-    local source_file="${SOURCE_DIR}/${r2_file}"
-
-    if [ ! -f "$source_file" ]; then
-      # Source file no longer exists, delete from R2
-      log "  Source removed, deleting from R2: $r2_file"
-
-      # Get file info for cleanup
-      local dir_path=$(dirname "$r2_file")
-      local filename=$(basename "$r2_file")
-      local name_no_ext="${filename%.*}"
-      local ext="${filename##*.}"
-
-      [ "$dir_path" = "." ] && dir_path=""
-      [ -n "$dir_path" ] && dir_path="${dir_path}/"
-
-      # Delete original
+    if ! echo "$expected_files" | grep -qF "$r2_file"; then
+      log "  Not in source, deleting from R2: $r2_file"
       delete_from_r2 "$r2_file"
-
-      # Delete associated processed files (ignore errors if they don't exist)
-      delete_from_r2 "${dir_path}${name_no_ext}_watermarked.${ext}" 2>/dev/null || true
-      delete_from_r2 "${dir_path}${name_no_ext}_thumb.${ext}" 2>/dev/null || true
-      delete_from_r2 "${dir_path}${name_no_ext}_thumb.jpg" 2>/dev/null || true
-      delete_from_r2 "${dir_path}${name_no_ext}_preview.jpg" 2>/dev/null || true
-
       : $((deleted_count++))
     fi
-  done <<< "$r2_originals"
+  done <<< "$R2_FILE_CACHE"
 
   log "Deleted $deleted_count file(s) from R2"
 }

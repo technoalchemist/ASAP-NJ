@@ -34,19 +34,19 @@
 
     ]
     ,
-    "Foo the Bar": [
+    "Foo": [
       {
         "filename": "Adrift.jpg",
         "type": "image",
-        "full": "https://pub-35431c64b54e4f579514c1cf25946692.r2.dev/Foo%20the%20Bar/Adrift_watermarked.jpg",
-        "thumbnail": "https://pub-35431c64b54e4f579514c1cf25946692.r2.dev/Foo%20the%20Bar/Adrift_thumb.jpg"
+        "full": "https://pub-35431c64b54e4f579514c1cf25946692.r2.dev/Foo/Adrift_watermarked.jpg",
+        "thumbnail": "https://pub-35431c64b54e4f579514c1cf25946692.r2.dev/Foo/Adrift_thumb.jpg"
       }
       ,
       {
         "filename": "accretion.jpg",
         "type": "image",
-        "full": "https://pub-35431c64b54e4f579514c1cf25946692.r2.dev/Foo%20the%20Bar/accretion_watermarked.jpg",
-        "thumbnail": "https://pub-35431c64b54e4f579514c1cf25946692.r2.dev/Foo%20the%20Bar/accretion_thumb.jpg"
+        "full": "https://pub-35431c64b54e4f579514c1cf25946692.r2.dev/Foo/accretion_watermarked.jpg",
+        "thumbnail": "https://pub-35431c64b54e4f579514c1cf25946692.r2.dev/Foo/accretion_thumb.jpg"
       }
 
     ]
