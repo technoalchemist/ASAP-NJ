@@ -77,6 +77,9 @@ if [ $total_images -gt 25 ] || [ $total_videos -gt 5 ]; then
   log "Large workload detected (${total_images} images, ${total_videos} videos) - enabling incremental publishing"
 fi
 
+# Cache R2 files for fast change detection
+cache_r2_files
+
 # Process counters
 failed=0
 processed=0
