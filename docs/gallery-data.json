@@ -59,6 +59,20 @@
         "preview": "https://pub-35431c64b54e4f579514c1cf25946692.r2.dev/Fubar/01%20-%20Dr.%20No%20(1962)_preview.jpg",
         "thumbnail": "https://pub-35431c64b54e4f579514c1cf25946692.r2.dev/Fubar/01%20-%20Dr.%20No%20(1962)_thumb.jpg"
       }
+      ,
+      {
+        "filename": "1305700854860.jpg",
+        "type": "image",
+        "full": "https://pub-35431c64b54e4f579514c1cf25946692.r2.dev/Fubar/Foo%20the%20Bar!/1305700854860_watermarked.jpg",
+        "thumbnail": "https://pub-35431c64b54e4f579514c1cf25946692.r2.dev/Fubar/Foo%20the%20Bar!/1305700854860_thumb.jpg"
+      }
+      ,
+      {
+        "filename": "_eclipse.jpg",
+        "type": "image",
+        "full": "https://pub-35431c64b54e4f579514c1cf25946692.r2.dev/Fubar/Foo%20the%20Bar!/_eclipse_watermarked.jpg",
+        "thumbnail": "https://pub-35431c64b54e4f579514c1cf25946692.r2.dev/Fubar/Foo%20the%20Bar!/_eclipse_thumb.jpg"
+      }
 
     ]
 

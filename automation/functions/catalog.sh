@@ -15,16 +15,19 @@ generate_catalog() {
 
   local first_category=true
 
-  # Process root-level files (General category)
+  # Get all unique top-level directories (categories)
+  local categories=$(find "$source_dir" -mindepth 1 -type f -regextype posix-extended \
+    -iregex ".*\.(${IMAGE_EXTS}|${VIDEO_EXTS})" \
+    -printf "%h\n" | \
+    sed "s|^$source_dir/*||" | \
+    cut -d'/' -f1 | \
+    sort -u)
+
+  # If no subdirectories, use "General" for root files
   local root_files=$(find "$source_dir" -maxdepth 1 -type f -regextype posix-extended \
     -iregex ".*\.(${IMAGE_EXTS}|${VIDEO_EXTS})" | sort)
 
   if [ -n "$root_files" ]; then
-    if [ "$first_category" = false ]; then
-      echo "    ," >> "$catalog_file"
-    fi
-    first_category=false
-
     echo "    \"$ROOT_CATEGORY\": [" >> "$catalog_file"
 
     local first_item=true
@@ -41,12 +44,15 @@ generate_catalog() {
 
     echo "" >> "$catalog_file"
     echo "    ]" >> "$catalog_file"
+    first_category=false
   fi
 
-  # Process subdirectories as categories
-  find "$source_dir" -mindepth 1 -maxdepth 1 -type d | sort | while read -r category_dir; do
-    local category_name=$(basename "$category_dir")
-    local category_files=$(find "$category_dir" -maxdepth 1 -type f -regextype posix-extended \
+  # Process each top-level category
+  while IFS= read -r category; do
+    [ -z "$category" ] && continue
+
+    # Find all files in this category (including nested subdirectories)
+    local category_files=$(find "$source_dir/$category" -type f -regextype posix-extended \
       -iregex ".*\.(${IMAGE_EXTS}|${VIDEO_EXTS})" | sort)
 
     [ -z "$category_files" ] && continue
@@ -56,7 +62,7 @@ generate_catalog() {
     fi
     first_category=false
 
-    echo "    \"$category_name\": [" >> "$catalog_file"
+    echo "    \"$category\": [" >> "$catalog_file"
 
     local first_item=true
     while IFS= read -r file; do
@@ -72,7 +78,7 @@ generate_catalog() {
 
     echo "" >> "$catalog_file"
     echo "    ]" >> "$catalog_file"
-  done
+  done <<< "$categories"
 
   # Close JSON structure
   echo "" >> "$catalog_file"
