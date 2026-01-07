@@ -179,7 +179,7 @@ while IFS= read -r file; do
       : $((failed++))
     fi
   fi
-done < <(find "$SOURCE_DIR" -type f -regextype posix-extended -iregex ".*\.(${IMAGE_EXTS}|${VIDEO_EXTS})" | sort)
+done < <(find "$SOURCE_DIR" -type f -regextype posix-extended -iregex ".*\.(${IMAGE_EXTS}|${VIDEO_EXTS})" -print0 | sort -z | tr '\0' '\n')
 
 log "Processed: $processed | Failed: $failed | Skipped: $skipped"
 
