@@ -11,7 +11,7 @@ fi
 trap release_lock EXIT
 
 # Pull latest from master
-REPO_DIR="/home/gallery-sync/repo"
+REPO_DIR="/opt/asap-gallery/repo"
 cd "$REPO_DIR" || exit 1
 
 echo "$(date): Pulling latest changes from master..."
