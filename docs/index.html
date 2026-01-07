@@ -252,6 +252,7 @@
                 .then(data => {
                     if (!data.categories || Object.keys(data.categories).length === 0) {
                         console.log('No images found in gallery');
+                        document.getElementById('gallery').innerHTML = '<p style="text-align: center; color: #969696; padding: 2rem; font-size: 18px;">Gallery coming soon! Check back later for stunning aerial photography.</p>';
                         return;
                     }
 
@@ -385,7 +386,12 @@
 
                     lightbox.init();
                 })
-                .catch(error => console.error('Error loading gallery:', error));
+                .catch(error => {
+                    console.error('Error loading gallery:', error);
+                    document.getElementById('gallery').innerHTML = '<p style="text-align: center; color: #969696; padding: 2rem; font-size: 18px;">Gallery coming soon! Check back later for stunning aerial photography.</p>';
+                    // Hide the featured image container too
+                    document.getElementById('featured-container').style.display = 'none';
+                });
 
             // Video lightbox functions
             window.openVideoLightbox = function(videoUrl) {
