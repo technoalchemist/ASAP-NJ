@@ -8,20 +8,17 @@
 
 set -euo pipefail  # Exit on error, undefined vars, pipe failures
 
-# Lockfile to prevent concurrent runs
-LOCKFILE="/tmp/gallery-sync.lock"
+# Source utilities
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/automation/functions/utils.sh"
 
-# Check for lockfile
-if [ -f "$LOCKFILE" ]; then
-  echo "$(date): Previous sync still running. Exiting."
-  exit 0
+# Acquire lock
+if ! acquire_lock; then
+  exit 1
 fi
 
-# Create lockfile
-touch "$LOCKFILE"
-
 # Ensure lockfile is removed on exit
-trap "rm -f $LOCKFILE" EXIT
+trap release_lock EXIT
 
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
