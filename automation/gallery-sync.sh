@@ -10,7 +10,7 @@ set -euo pipefail  # Exit on error, undefined vars, pipe failures
 
 # Source utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/automation/functions/utils.sh"
+source "$SCRIPT_DIR/functions/utils.sh"
 
 # Acquire lock
 if ! acquire_lock; then
