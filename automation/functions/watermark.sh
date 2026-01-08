@@ -1,32 +1,30 @@
 #!/bin/bash
 #
-# Watermark generation functions
+# Image watermarking functions
 #
 
 generate_watermark() {
   local input_file="$1"
   local output_file="$2"
-
-  # Calculate font size based on image height
-  local img_height=$(identify -format "%h" "$input_file")
-  local font_size=$((img_height * $WATERMARK_SIZE / 1000))
-
-  # Generate watermarked image
+  
+  local watermark_text="$WATERMARK_TEXT"
+  local watermark_opacity="$WATERMARK_OPACITY"
+  
+  # Generate watermark with ImageMagick (stdin redirected)
   convert "$input_file" \
     -gravity SouthEast \
-    -font "$WATERMARK_FONT" \
-    -pointsize "$font_size" \
-    -fill "rgba(255,255,255,0.${WATERMARK_OPACITY})" \
-    -stroke "rgba(0,0,0,0.3)" \
-    -strokewidth 1 \
-    -annotate +20+20 "$WATERMARK_TEXT" \
-    "$output_file"
-
-  if [ $? -eq 0 ]; then
+    -pointsize 48 \
+    -fill "rgba(255,255,255,$watermark_opacity)" \
+    -annotate +30+30 "$watermark_text" \
+    "$output_file" \
+    </dev/null \
+    2>&1 | tee -a "$LOG_FILE"
+  
+  if [ ${PIPESTATUS[0]} -eq 0 ]; then
     log "  Created watermark: $(basename "$output_file")"
     return 0
   else
-    log "  ERROR: Failed to watermark $(basename "$input_file")"
+    log "  ERROR: Failed to create watermark for $(basename "$input_file")"
     return 1
   fi
 }

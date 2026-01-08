@@ -69,10 +69,10 @@ fi
 
 # Auto-enable incremental publishing for large workloads
 INCREMENTAL_PUBLISH="false"
-if [ $total_images -gt 25 ] || [ $total_videos -gt 5 ]; then
-  INCREMENTAL_PUBLISH="true"
-  log "Large workload detected (${total_images} images, ${total_videos} videos) - enabling incremental publishing"
-fi
+#if [ $total_images -gt 25 ] || [ $total_videos -gt 5 ]; then
+#  INCREMENTAL_PUBLISH="true"
+#  log "Large workload detected (${total_images} images, ${total_videos} videos) - enabling incremental publishing"
+#fi
 
 # Cache R2 files for fast change detection
 cache_r2_files
@@ -179,7 +179,7 @@ while IFS= read -r file; do
       : $((failed++))
     fi
   fi
-done < <(find "$SOURCE_DIR" -type f -regextype posix-extended -iregex ".*\.(${IMAGE_EXTS}|${VIDEO_EXTS})" -print0 | sort -z | tr '\0' '\n')
+done < <(find "$SOURCE_DIR" -type f -regextype posix-extended -iregex ".*\.(${IMAGE_EXTS}|${VIDEO_EXTS})" -printf "%p\n" | sort)
 
 log "Processed: $processed | Failed: $failed | Skipped: $skipped"
 
