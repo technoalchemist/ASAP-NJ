@@ -32,6 +32,68 @@
             .social-links a:hover { transform: scale(1.1); }
             .social-links svg { width: 44px; height: 44px; }
         </style>
+        <!-- Blog CSS -->
+        <style>
+            #blog-section {
+            margin: 40px auto;
+            }
+
+            #blog-content {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 24px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            }
+
+            .blog-post-title {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-size: 28px;
+            color: #fff;
+            margin-bottom: 12px;
+            text-decoration: none;
+            display: block;
+            transition: color 0.3s ease;
+            }
+
+            .blog-post-title:hover {
+            color: #969696;
+            }
+
+            .blog-post-meta {
+            color: #6a6a6a;
+            font-size: 14px;
+            margin-bottom: 16px;
+            }
+
+            .blog-post-preview {
+            color: #ababab;
+            line-height: 1.6;
+            margin-bottom: 16px;
+            }
+
+            .blog-post-thumbnail {
+            width: 100%;
+            max-width: 600px;
+            height: auto;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            display: block;
+            }
+
+            .blog-read-more {
+            display: inline-block;
+            color: #969696;
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.3s ease;
+            }
+
+            .blog-read-more:hover {
+            color: #fff;
+            }
+        </style>
         <!-- PhotoSwipe CSS -->
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/photoswipe@5.4.3/dist/photoswipe.css">
     </head>
@@ -59,6 +121,13 @@
                     </svg>
                 </a>
                 <a href='https://certificates.airdata.com/BGSepI' target='_blank'><img align="right" alt='FAA Part 107 Logo' src='graphics/FAA-Certified-Banner.png' style='width:379px;height:100px;border:0;image-rendering: optimizequality;image-rendering: smooth;'></a>
+            </div>
+        </section>
+        <!-- Blog Section - Latest from Substack -->
+        <section id="blog-section" class="container">
+            <h2><a href="https://asapnj.substack.com" target="_blank" rel="noopener noreferrer" style="color: inherit; text-decoration: none;">Latest from ASAP-NJ</a></h2>
+            <div id="blog-content">
+                <p style="text-align: center; color: #969696;">Loading latest post...</p>
             </div>
         </section>
         <section id="gallery-section">
@@ -429,5 +498,125 @@
             <button class="video-lightbox-close" onclick="closeVideoLightbox()">×</button>
             <video id="lightbox-video" controls></video>
         </div>
+        <script>
+            // Fetch and display latest Substack post
+            async function loadLatestBlogPost() {
+                const blogContent = document.getElementById('blog-content');
+                const substackFeed = 'https://asapnj.substack.com/feed';
+
+                try {
+                    // Try direct RSS fetch first
+                    let response = await fetch(substackFeed);
+
+                    // If CORS blocked, fall back to rss2json
+                    if (!response.ok) {
+                        throw new Error('Direct fetch failed, trying proxy...');
+                    }
+
+                    const xmlText = await response.text();
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+
+                    // Get the first item (latest post)
+                    const item = xmlDoc.querySelector('item');
+
+                    if (!item) {
+                        blogContent.innerHTML = '<p style="text-align: center; color: #969696;">No posts yet. Check back soon!</p>';
+                        return;
+                    }
+
+                    const title = item.querySelector('title').textContent;
+                    const link = item.querySelector('link').textContent;
+                    const pubDate = new Date(item.querySelector('pubDate').textContent);
+                    const description = item.querySelector('description').textContent;
+
+                    // Extract thumbnail if exists (check for enclosure or image in content)
+                    const enclosure = item.querySelector('enclosure');
+                    let thumbnail = null;
+                    if (enclosure && enclosure.getAttribute('type')?.startsWith('image/')) {
+                        thumbnail = enclosure.getAttribute('url');
+                    }
+
+                    // Truncate description to ~200 chars
+                    const cleanDescription = description.replace(/<[^>]*>/g, ''); // Strip HTML
+                    const preview = cleanDescription.length > 200
+                        ? cleanDescription.substring(0, 200) + '...'
+                        : cleanDescription;
+
+                    // Format date
+                    const formattedDate = pubDate.toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    });
+
+                    // Build the HTML
+                    let html = `
+                <a href="${link}" target="_blank" rel="noopener noreferrer" class="blog-post-title">${title}</a>
+                <div class="blog-post-meta">${formattedDate}</div>
+            `;
+
+                    if (thumbnail) {
+                        html += `<img src="${thumbnail}" alt="${title}" class="blog-post-thumbnail">`;
+                    }
+
+                    html += `
+                <div class="blog-post-preview">${preview}</div>
+                <a href="${link}" target="_blank" rel="noopener noreferrer" class="blog-read-more">Read more on Substack →</a>
+            `;
+
+                    blogContent.innerHTML = html;
+
+                } catch (error) {
+                    console.error('Error loading blog post:', error);
+
+                    // Fall back to rss2json API
+                    try {
+                        const proxyUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(substackFeed)}`;
+                        const proxyResponse = await fetch(proxyUrl);
+                        const data = await proxyResponse.json();
+
+                        if (data.status === 'ok' && data.items && data.items.length > 0) {
+                            const post = data.items[0];
+                            const pubDate = new Date(post.pubDate);
+                            const formattedDate = pubDate.toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                            });
+
+                            const cleanDescription = post.description.replace(/<[^>]*>/g, '');
+                            const preview = cleanDescription.length > 200
+                                ? cleanDescription.substring(0, 200) + '...'
+                                : cleanDescription;
+
+                            let html = `
+                        <a href="${post.link}" target="_blank" rel="noopener noreferrer" class="blog-post-title">${post.title}</a>
+                        <div class="blog-post-meta">${formattedDate}</div>
+                    `;
+
+                            if (post.thumbnail) {
+                                html += `<img src="${post.thumbnail}" alt="${post.title}" class="blog-post-thumbnail">`;
+                            }
+
+                            html += `
+                        <div class="blog-post-preview">${preview}</div>
+                        <a href="${post.link}" target="_blank" rel="noopener noreferrer" class="blog-read-more">Read more on Substack →</a>
+                    `;
+
+                            blogContent.innerHTML = html;
+                        } else {
+                            blogContent.innerHTML = '<p style="text-align: center; color: #969696;">No posts yet. Check back soon!</p>';
+                        }
+                    } catch (fallbackError) {
+                        console.error('Fallback also failed:', fallbackError);
+                        blogContent.innerHTML = '<p style="text-align: center; color: #969696;">Unable to load blog posts. Please try again later.</p>';
+                    }
+                }
+            }
+
+            // Load blog post when page loads
+            loadLatestBlogPost();
+        </script>
     </body>
 </html>
